@@ -353,6 +353,12 @@ snippet fluxa
 	var util = require("../../extra/util");
 
 	var Actions = {
+	  reloadGrid: function (params) {
+		AppDispatcher.handleViewAction({
+		  actionType: AppConstants.FINANCE_RECEIVABLES_CONFIRM_RELOAD_GRID,
+		  params: params
+		});
+	  },
 	  noop: function(){}
 	};
 
@@ -481,6 +487,9 @@ snippet fluxs
 	  var action = evt.action;
 	  switch (action.actionType) {
 		case AppConstants.FINANCE_RECEIVABLES_CONFIRM_RELOAD_GRID:
+		  if(action.params) { params = $.extend(params, action.params) }
+		  reloadJqGrid();
+		  Store.emit( AppConstants.FINANCE_RECEIVABLES_CONFIRM_EVENT );
 		default:
 	  }
 	});
