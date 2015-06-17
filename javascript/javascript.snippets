@@ -7,9 +7,9 @@ snippet proto
 	};
 # Function
 snippet fun
-	function ${1:function_name}(${2}) {
+	function (${1}) {
 		${0}
-	}
+	},
 # Anonymous Function
 snippet f
 	function(${1}) {
@@ -311,12 +311,6 @@ snippet pt
 		${1}: React.PropTypes.${2:string}
 	},
 snippet rcc
-	/**
-	 * @jsx React.DOM
-	 */
-
-	var React = require('react');
-
 	var ${1:ClassName} = React.createClass({
 
 		render: function() {
@@ -347,19 +341,28 @@ snippet state
 snippet trp
 	transferPropsTo(${1});
 snippet fluxa
-	var AppDispatcher = require('${1:../dispatcher/AppDispatcher}');
-	var AppConstants = require('${2:../constants/AppConstants'});
+	var AppDispatcher = require('../dispatcher/AppDispatcher');
+	var AppConstants = require('../constants/AppConstants');
 	var $ = require("jquery");
-	var util = require("../../extra/util");
+	var util = require("../extra/util");
 
 	var Actions = {
-	  reloadGrid: function (params) {
+	  reloadGrid: function(params) {
 		AppDispatcher.handleViewAction({
-		  actionType: AppConstants.FINANCE_RECEIVABLES_CONFIRM_RELOAD_GRID,
+		  actionType: AppConstants.OFFICE_ITEM_RELOAD_GRID,
 		  params: params
 		});
 	  },
-	  noop: function(){}
+	  setAct: function (act) {
+		AppDispatcher.handleViewAction({
+		  actionType: AppConstants.OFFICE_ITEM_SET_ACT,
+		  act: act
+		});
+	  },
+	  handleSearch: function(params) {
+		Actions.reloadGrid(params);
+	  },
+	  noop: function() {}
 	};
 
 	module.exports = Actions;
@@ -370,18 +373,20 @@ snippet fluxv
 	var AppConstants = require('../../constants/AppConstants');
 	var SmartAdminBox = require("../../rc-component/smart_admin_box");
 	var JqGrid = require("../../rc-component/rc-jqgrid");
-	var Actions = require("../../actions/FinanceReceivablesConfirmAction");
-	var Store = require("../../stores/FinanceReceivablesConfirmStore");
+	var Actions = require("../../actions/OfficeItemActions");
+	var Store = require("../../stores/OfficeItemStore");
 	var util = require("../../extra/util");
 
-	var App = React.createClass({
+	var Toolbar = require("./Toolbar");
+
+	var MainApp = React.createClass({
 	  getInitialState: function() {
 		return {
 		  selected: []
 		};
 	  },
 	  componentWillMount: function() {
-		Store.addListener( AppConstants.FINANCE_RECEIVABLES_CONFIRM_EVENT, this._onChange );
+		Store.addListener(AppConstants.OFFICE_ITEM_CHANGE_EVENT, this._onChange);
 	  },
 	  _onChange: function() {
 		this.setState({
@@ -392,24 +397,21 @@ snippet fluxv
 	  render: function() {
 		var config = Store.getJqconfig();
 		var gridId = Store.getJqgridId();
-		return (
-		  <div className="row">
-			<SmartAdminBox title={"收款单列表"}>
-			  <JqGrid  config={config} grid_id={gridId} jqAction="finance_receivables_confirm" />
-			</SmartAdminBox>
-		  </div>
+		return(
+		  <SmartAdminBox title={"物料列表"}>
+			<JqGrid  config={config} grid_id={gridId} jqAction="items_index_list" />
+		  </SmartAdminBox>
 		);
 	  }
 	});
 
-	React.render(<App />, document.getElementById('widget-grid'));
+	module.exports = MainApp;
 
 snippet fluxs
 	var AppDispatcher = require('../dispatcher/AppDispatcher');
 	var AppConstants = require('../constants/AppConstants');
 	var $ = require('jquery');
 	var rcUtil = require('rc-util');
-	require("../extra/string.formart");
 
 	var objectAssign = require('object-assign');
 	var EventEmitter = require('events').EventEmitter; // 取得一個 pub/sub 廣播器
@@ -419,24 +421,26 @@ snippet fluxs
 	var jqgridId = rcUtil.guid();
 
 
-	objectAssign( Store, EventEmitter.prototype, {
-	  getJqconfig: function () {
+	objectAssign(Store, EventEmitter.prototype, {
+	  getJqconfig: function() {
 		return config;
 	  },
-	  getJqgridId: function () {
+	  getJqgridId: function() {
 		return jqgridId;
 	  },
-	  getSelected: function () {
+	  getSelected: function() {
 		return selected;
 	  },
 	  noop: null
 	});
 
-	var getGrid = function () {
+	var getGrid = function() {
 	  return $("#" + jqgridId).jqGrid();
 	};
-	var reloadJqGrid = function () {
-	  getGrid().setGridParam({postData: params}).trigger("reloadGrid");
+	var reloadJqGrid = function() {
+	  getGrid().setGridParam({
+		postData: params
+	  }).trigger("reloadGrid");
 	};
 
 	var config = {
@@ -444,17 +448,10 @@ snippet fluxs
 	  datatype: "JSON",
 	  postData: params,
 	  height: 'auto',
-	  colNames: ["单号", "发票号", "项目", "联系人", "线路名称", "金额", "状态", "确认时间"],
-	  colModel: [
-		{name: 'bill_no'},
-		{name: 'print_invoice_no'},
-		{name: 'subject'},
-		{name: 'contact_name', sortable: false},
-		{name: 'product_name', sortable: false},
-		{name: 'amount', sortable: false},
-		{name: 'status'},
-		{name: "received_time"}
-	  ],
+	  colNames: ["单号"],
+	  colModel: [{
+		name: 'bill_no'
+	  }],
 	  rowNum: 10,
 	  rowList: [10, 50, 100],
 	  autowidth: true,
@@ -462,37 +459,46 @@ snippet fluxs
 	  sortorder: "asc",
 	  shrinkToFit: false,
 	  multiselect: true,
+	  multiboxonly: true,
 	  viewrecords: true,
-	  onSelectRow: function (id, is_check) {
+	  onSelectRow: function(id, is_check) {
 		selected = getGrid().getGridParam("selarrrow");
-		Store.emit( AppConstants.FINANCE_RECEIVABLES_CONFIRM_EVENT );
+		Store.emit(AppConstants.OFFICE_ITEM_CHANGE_EVENT);
 	  },
-	  onSelectAll: function (ids, is_check) {
+	  onSelectAll: function(ids, is_check) {
 		selected = getGrid().getGridParam("selarrrow");
-		Store.emit( AppConstants.FINANCE_RECEIVABLES_CONFIRM_EVENT );
+		Store.emit(AppConstants.OFFICE_ITEM_CHANGE_EVENT);
 	  },
-	  gridComplete: function () {
+	  gridComplete: function() {
 		var grid = getGrid();
 		var ids = grid.getDataIDs();
-		$.each(selected, function (index, select) {
-		  if(ids.indexOf(select) == -1) {
-			selected.splice(selected.indexOf(select), 1);
-		  }
-		  grid.setSelection(select);
+		$.each(selected, function(index, select) {
+		  ids.indexOf(select) == -1 ? selected.splice(selected.indexOf(select), 1) : grid.setSelection(select);
 		})
-		Store.emit( AppConstants.FINANCE_RECEIVABLES_CONFIRM_EVENT );
+		Store.emit(AppConstants.OFFICE_ITEM_CHANGE_EVENT);
 	  }
 	}
-	Store.dispatchToken = AppDispatcher.register( function eventHandlers(evt) {
+	Store.dispatchToken = AppDispatcher.register(function eventHandlers(evt) {
 	  var action = evt.action;
-	  switch (action.actionType) {
-		case AppConstants.FINANCE_RECEIVABLES_CONFIRM_RELOAD_GRID:
-		  if(action.params) { params = $.extend(params, action.params) }
+	  switch(action.actionType) {
+		case AppConstants.OFFICE_ITEM_RELOAD_GRID:
+		  if(action.params) {
+			params = $.extend(params, action.params)
+		  }
 		  reloadJqGrid();
-		  Store.emit( AppConstants.FINANCE_RECEIVABLES_CONFIRM_EVENT );
+		  Store.emit(AppConstants.OFFICE_ITEM_CHANGE_EVENT);
+		  break
+		case AppConstants.OFFICE_ITEM_SET_ACT:
+		  act = action.act;
+		  if(act == "index") {
+			reloadJqGrid();
+		  }
+		  Store.emit(AppConstants.OFFICE_ITEM_CHANGE_EVENT);
 		default:
 	  }
 	});
 
 	module.exports = Store;
 
+snippet con
+	console.info(${1:1111});
